@@ -16,7 +16,7 @@ class GeminiService:
         }
         # Store conversation history for each user
         self.conversation_history: Dict[str, List[Dict[str, str]]] = {}
-        # Store user context (name, preferred language, etc.)
+        # Store user context (name, etc.)
         self.user_context: Dict[str, Dict[str, str]] = {}
 
     def _get_user_history(self, userid: str) -> List[Dict[str, str]]:
@@ -35,18 +35,9 @@ class GeminiService:
         """Update user context based on the message"""
         if userid not in self.user_context:
             self.user_context[userid] = {
-                "name": None,
-                "preferred_language": None
+                "name": None
             }
         
-        # Detect language
-        if any(char in message for char in ['ा', 'ी', 'ु', 'ू', 'े', 'ै', 'ो', 'ौ', 'ं', 'ः']):
-            self.user_context[userid]["preferred_language"] = "Marathi"
-        elif any(char in message for char in ['ा', 'ी', 'ु', 'ू', 'े', 'ै', 'ो', 'ौ', 'ं', 'ः', '़']):
-            self.user_context[userid]["preferred_language"] = "Hindi"
-        else:
-            self.user_context[userid]["preferred_language"] = "English"
-
         # Try to extract name if not already set
         if not self.user_context[userid]["name"]:
             # Look for name in conversation history
@@ -105,31 +96,38 @@ class GeminiService:
             # Get user context
             user_context = self.user_context.get(userid, {})
             user_name = user_context.get("name", "User")
-            preferred_language = user_context.get("preferred_language", "English")
+
+            # Get current date and time
+            current_time = datetime.now()
+            formatted_date = current_time.strftime("%Y-%m-%d")
+            formatted_time = current_time.strftime("%H:%M:%S")
 
             # Prepare the request payload
             payload = {
                 "contents": [{
                     "parts": [{
-                        "text": f"{SYSTEM_PROMPT}\n\nUser Context:\n- Name: {user_name}\n- Preferred Language: {preferred_language}\n\nConversation History:\n{conversation_context}\n\nUser (ID: {userid}): {message}"
+                        "text": f"{SYSTEM_PROMPT}\n\nCurrent Date and Time:\n- Date: {formatted_date}\n- Time: {formatted_time}\n\nUser Context:\n- Name: {user_name}\n\nConversation History:\n{conversation_context}\n\nUser (ID: {userid}): {message}"
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 0.7,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 1024,
+                    "temperature": 0.3,  # Reduced from 0.5 for more focused responses
+                    "topK": 10,         # Reduced from 20 for faster selection
+                    "topP": 0.7,        # Increased from 0.8 for more confident responses
+                    "maxOutputTokens": 800,  # Reduced from 512 for faster generation
+                    "candidateCount": 1,  # Only generate one response
+                    "stopSequences": [],  # No stop sequences for faster completion
                 },
                 "tools": [{
                     "functionDeclarations": FUNCTION_SCHEMAS
                 }]
             }
 
-            # Make the API request
+            # Make the API request with timeout
             response = requests.post(
                 f"{self.api_url}?key={self.api_key}",
                 headers=self.headers,
-                json=payload
+                json=payload,
+                timeout=5  # 5 second timeout
             )
 
             if response.status_code != 200:
@@ -208,10 +206,10 @@ Here is the raw function response to format:
                                             }]
                                         }],
                                         "generationConfig": {
-                                            "temperature": 0.7,
-                                            "topK": 40,
-                                            "topP": 0.95,
-                                            "maxOutputTokens": 1024,
+                                            "temperature": 0.5,
+                                            "topK": 20,
+                                            "topP": 0.8,
+                                            "maxOutputTokens": 512,
                                         }
                                     }
                                 else:
@@ -223,10 +221,10 @@ Here is the raw function response to format:
                                             }]
                                         }],
                                         "generationConfig": {
-                                            "temperature": 0.7,
-                                            "topK": 40,
-                                            "topP": 0.95,
-                                            "maxOutputTokens": 1024,
+                                            "temperature": 0.5,
+                                            "topK": 20,
+                                            "topP": 0.8,
+                                            "maxOutputTokens": 512,
                                         }
                                     }
                                 
